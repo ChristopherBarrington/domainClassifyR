@@ -1,0 +1,13 @@
+Package: domainClassifyR
+Title: Classification of Hi-C interaction domains
+Version: 0.0.0.9000
+Authors@R: person('Christopher', 'Barrington', email='c.barrington@ucl.ac.uk', role=c('aut', 'cre'))
+Description: Given a set of genomic intervals and score track, this package identifies groups of intervals that share chromosome structure. Domains are sectioned into [four] parts and classified into groups based on the interactions observed in these sectors.
+Depends:
+	dplyr,
+	plyr,
+	snow
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
