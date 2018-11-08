@@ -89,7 +89,7 @@ Using example data, script should complete in minutes.
 library(misha)
 library(domainClassifyR)
 
-# set the misha GENOME_DB root (eg to the mm10 directory included in the example_data [get ftp link])
+# set the misha GENOME_DB root (eg extract the example_data mm10 archive into /absolute/path/to/GENOME_DB)
 gsetroot('/absolute/path/to/GENOME_DB/mm10/')
 
 # load data / set parameters
