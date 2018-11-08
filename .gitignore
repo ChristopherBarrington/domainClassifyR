@@ -10,7 +10,8 @@
 
 # Output files from R CMD build
 /*.tar.gz
-/.*tgz
+/*.tgz
+/*.tar.bz2
 
 # Output files from R CMD check
 /*.Rcheck/
