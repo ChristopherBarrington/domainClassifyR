@@ -1,5 +1,7 @@
 # domainClassifyR
 
+The aim of this analysis was to identify distinct distributions of interacting contacts within genomic regions. A pair of thresholds is applied to the Z-scores: a minimum threshold to identify sectors that are enriched and a maximum threshold to identify sectors that are not enriched.
+
 ## Installation
 
 Please have 'misha' R package installed prior to running run_domainClassifyR.R, with a GENOME_DB configured (minimum example provided in example_data).
@@ -69,6 +71,10 @@ See `?get.fend.samples`
 
 Using the number of sampled contacts per sector, `get_Z_statistics()` calculates the mean and standard deviation of the sector distributions which are used with the number of observed interactors to calculate a Z-score for each sector (of each 2D interval). This is saved into `$Z_STATISTICS`. Z-scores are converted to p-values using `pnorm` (`P`). `get_min_fend_pair_domains()` is used to filter the 2D interval set, requiring that an interval pair has at least `min` interactors. Multiple testing is then corrected for using `get_Q_values()`. The 2D intervals set is collapsed to a data such that each row is a filtered 2D interval and each column is `P` for each sector in the 2D interval. Each column is corrected using the method specified by `method` which is passed to `p.adjust()`.
 
+The enrichment of each sector in 2D regions is calculated independently so each region may have multiple enriched sectors. The classification of the 2D region is the aggregate
+of the enriched domain sectors. Regions that have a sector classified as ambiguous are excluded from further analysis. Increasing the lower threshold or decreasing the
+upper threshold would decrease the number of ambiguous sectors identified but could decrease specificity (or homogeneity) of the classified groups. Therefore, a TAD presented with a ‘Corner’ classification (loop domain) shows specific (and exclusive) enrichment of high-scoring contacts in the 60kb interacting region between the TAD borders. TADs with multiple enriched sectors were not considered; in these TADs, the Leading+Corner or Trailing+Corner sectors were most common.
+
 - `min` Minimum number of contacts or interactors required in a domain
 - `measure` Should be `'HIGH_SCORE'` or `'ALL'` to determine which contact set is filtered by
 - `method` The correction method to apply, see `?p.adjust`
@@ -88,7 +94,7 @@ gsetroot('/absolute/path/to/GENOME_DB/mm10/')
 
 # load data / set parameters
 intervals_2d <- gintervals.load("intervs.chr19_domains")
-track_nm <- 'hic.example_project.example_dataset.tracks.score'
+track_nm <- 'hic.example_project.example_dataset.score'
 cache_path <- file.path(getwd(), 'domainclassifyr_cache')
 
 # run the parts of the package
@@ -128,3 +134,136 @@ ggplot2::ggplot(contacts[['2106:2106']]$CONTACTS$HIGH_SCORE)+
   aes(x=FEND.X,y=FEND.Y,colour=SCORE)+
   geom_point(shape=20)+coord_fixed()+theme(aspect.ratio=1)
 ```
+
+## Example output
+
+### Running the MWE
+
+This should produce not produce any output except for progress bars (unless there is an error).
+
+```
+> contacts <- get_contacts(domains=intervals_2d,
++                          track_nm=track_nm,
++                          cache.path=cache_path,
++                          band=c(10e3,15e6),
++                          get.fends=FALSE)
+[get.contacts] Getting contact matrices for 85 domains
+[get.contacts] Saving new domains to cache [n=85]
+  |======================================================================| 100%
+[get.contacts] Preallocating a 85 element list
+[get.contacts] Loading matrices from cache (/home/local/domainclassifyr_cache)
+  |======================================================================| 100%
+> contacts <- add.domain.features(contacts, resolution=60e3)
+[add.domain.features] Adding domain features
+  |======================================================================| 100%
+> contacts <- get.high.score.fends(contacts, min_score=40)
+[get.high.score.fends] Identifying high-scoring fends [>=40]
+  |======================================================================| 100%
+> contacts <- count.contacts(contacts)
+[count.contacts] Counting contacts
+  |======================================================================| 100%
+> contacts <- get.domain.position.classifications(contacts)
+Getting distribution of fend positions
+  |======================================================================| 100%
+> contacts <- get.fend.samples(contacts, n=1000)
+[get.fend.samples] Randomly selecting contacts from ALL [x 1,000]
+> contacts <- get_Z_statistics(contacts)
+[get_Z_statistics] Calculating Z-statistics and p-values
+  |======================================================================| 100%
+> contacts <- get_min_fend_pair_domains(contacts, min=100)
+[get_min_fend_pair_domains] Selecting domains with at least 100 fend pairs in HIGH_SCORE
+> contacts <- get_Q_values(contacts)
+[get_Q_values] Correcting for multiple testing
+>
+```
+
+### Example structure the results
+
+Shown is the structure for the first TAD in the `contacts` list of 2D intervals.
+
+```
+> str(contacts[[1]])
+List of 6
+ $ DOMAIN                 :'data.frame':	1 obs. of  13 variables:
+  ..$ chrom1     : Factor w/ 1 level "chr19": 1
+  ..$ start1     : num 3172500
+  ..$ end1       : num 4974499
+  ..$ chrom2     : Factor w/ 1 level "chr19": 1
+  ..$ start2     : num 3172500
+  ..$ end2       : num 4974499
+  ..$ intervalID : Factor w/ 1 level "2012:2012": 1
+  ..$ intervalID1: num 2012
+  ..$ SIZE1      : num 1801999
+  ..$ intervalID2: num 2012
+  ..$ SIZE2      : num 1801999
+  ..$ L1         : Factor w/ 1 level "SELF": 1
+  ..$ AREA       : num 3.25e+12
+ $ CONTACTS               :List of 3
+  ..$ ALL                 :'data.frame':	88394 obs. of  7 variables:
+  .. ..$ FEND.X       : num [1:88394] 3669732 3671461 3665714 3671461 3663092 ...
+  .. ..$ FEND.Y       : num [1:88394] 4965109 4965109 4973544 4973544 4965622 ...
+  .. ..$ SCORE        : num [1:88394] -13.2 -13.7 -16.8 -12.7 -14.3 ...
+  .. ..$ GROUP.X      : num [1:88394] 8 8 8 8 8 8 8 8 8 8 ...
+  .. ..$ GROUP.Y      : num [1:88394] 0 0 0 0 0 0 0 0 0 0 ...
+  .. ..$ FEND.DISTANCE: num [1:88394] 1295377 1293648 1307830 1302083 1302530 ...
+  .. ..$ POSITION     : Factor w/ 4 levels "CORNER","FORWARD",..: 3 3 3 3 3 3 3 3 3 3 ...
+  ..$ HIGH_SCORE          :'data.frame':	3113 obs. of  7 variables:
+  .. ..$ FEND.X       : num [1:3113] 3796255 3734437 3734436 3734436 3734437 ...
+  .. ..$ FEND.Y       : num [1:3113] 3980935 3919813 3919812 3904170 3904170 ...
+  .. ..$ SCORE        : num [1:3113] 40.1 40.1 40.1 40.6 40.6 ...
+  .. ..$ GROUP.X      : num [1:3113] 10 9 9 9 9 9 9 9 9 9 ...
+  .. ..$ GROUP.Y      : num [1:3113] 16 17 17 17 17 17 17 17 17 17 ...
+  .. ..$ FEND.DISTANCE: num [1:3113] 184680 185376 185376 169734 169733 ...
+  .. ..$ POSITION     : Factor w/ 4 levels "CORNER","FORWARD",..: 4 4 4 4 4 4 4 4 4 4 ...
+  ..$ RANDOM_SAMPLE_TABLES:List of 1
+  .. ..$ OBSERVED: int [1:1000, 1:4] 0 0 0 0 0 1 0 0 0 0 ...
+  .. .. ..- attr(*, "dimnames")=List of 2
+  .. .. .. ..$ : NULL
+  .. .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+ $ CACHE.FILE             : chr "/home/local/domainclassifyr_cache/1c7f7c30abbde91764ed70e8ddc14d62.RData"
+ $ N_CONTACTS             :List of 2
+  ..$ ALL       : int 88394
+  ..$ HIGH_SCORE: int 3113
+ $ FEND.SCORE.DISTRIBUTION:List of 7
+  ..$ ALL            : 'table' num [1:4(1d)] 3 645 4697 83049
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ HIGH_SCORE     : 'table' num [1:4(1d)] 0 41 1196 1876
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ SCORES_dALL_mHS: 'table' num [1:4(1d)] 0 197.9 792.7 70.3
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ SCORES_dHS_mALL: 'table' num [1:4(1d)] 0 8.5 1804.6 50048.2
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ SCORES_dALL    : 'table' num [1:4(1d)] 0 0.0636 0.2546 0.0226
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ SCORES_dHS     : 'table' num [1:4(1d)] 0 0.0132 0.3842 0.6026
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  ..$ SCORES         : 'table' num [1:4(1d)] 0 0.0132 0.3842 0.6026
+  .. ..- attr(*, "dimnames")=List of 1
+  .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+ $ Z_STATISTICS           :List of 1
+  ..$ OBSERVED:List of 7
+  .. ..$ MEAN: Named num [1:4] 0.105 22.711 165.189 2924.995
+  .. .. ..- attr(*, "names")= chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ SDEV: Named num [1:4] 0.313 4.776 12.401 13.192
+  .. .. ..- attr(*, "names")= chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ OBS : 'table' num [1:4(1d)] 0 41 1196 1876
+  .. .. ..- attr(*, "dimnames")=List of 1
+  .. .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ Z   : 'table' num [1:4(1d)] -0.335 3.829 83.125 -79.52
+  .. .. ..- attr(*, "dimnames")=List of 1
+  .. .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ P   : 'table' num [1:4(1d)] 6.31e-01 6.43e-05 0.00 1.00
+  .. .. ..- attr(*, "dimnames")=List of 1
+  .. .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ p   : 'table' num [1:4(1d)] 6.31e-01 6.43e-05 0.00 1.00
+  .. .. ..- attr(*, "dimnames")=List of 1
+  .. .. .. ..$ : chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+  .. ..$ Q   : Named num [1:4] 1 0.000148 0 1
+  .. .. ..- attr(*, "names")= chr [1:4] "CORNER" "FORWARD" "REVERSE" "OTHER"
+>```
